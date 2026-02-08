@@ -148,9 +148,11 @@ func (p *Poller) syncConfig() {
 	// Apply new config
 	p.gateway.ApplyConfig(apiResp.Data)
 
-	// Generate Traefik dynamic config
-	if err := GenerateTraefikConfig(p.traefikDir, apiResp.Data.Connections); err != nil {
-		log.Printf("[poller] traefik config generation failed: %v", err)
+	// Generate Traefik dynamic config (optional — skip if dir is empty or not configured)
+	if p.traefikDir != "" {
+		if err := GenerateTraefikConfig(p.traefikDir, apiResp.Data.Connections); err != nil {
+			log.Printf("[poller] traefik config generation failed: %v", err)
+		}
 	}
 }
 
