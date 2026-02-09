@@ -24,6 +24,18 @@ func init() {
 		&MemoryProfile{},
 		&FilesystemProfile{},
 		&ThinkingProfile{},
+		&DnsProfile{},
+		&CryptoProfile{},
+		&HealthcheckProfile{},
+		&CronProfile{},
+		&RegexProfile{},
+		&MathProfile{},
+		&IpProfile{},
+		&WebhookProfile{},
+		&EmailProfile{},
+		&TransformProfile{},
+		&DatabaseProfile{},
+		&RedisProfile{},
 	}
 	for _, p := range reg {
 		Registry[p.ID()] = p
