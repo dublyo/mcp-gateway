@@ -297,6 +297,21 @@ func (p *DatabaseProfile) explainQuery(args map[string]interface{}, env map[stri
 		return "", fmt.Errorf("sql is required")
 	}
 
+	// EXPLAIN ANALYZE actually executes the query, so enforce same safety checks
+	normalized := strings.ToUpper(strings.TrimSpace(sqlStr))
+	if !strings.HasPrefix(normalized, "SELECT") && !strings.HasPrefix(normalized, "WITH") {
+		readOnly := env["READ_ONLY"]
+		if readOnly == "" || readOnly == "true" {
+			return "", fmt.Errorf("only SELECT queries can be explained (READ_ONLY mode)")
+		}
+	}
+
+	for _, kw := range []string{"DROP ", "TRUNCATE ", "ALTER ", "GRANT ", "REVOKE "} {
+		if strings.Contains(normalized, kw) {
+			return "", fmt.Errorf("%s statements cannot be explained for safety", strings.TrimSpace(kw))
+		}
+	}
+
 	db, err := p.getDB(env)
 	if err != nil {
 		return "", err

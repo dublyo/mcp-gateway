@@ -99,6 +99,7 @@ func (g *Gateway) ApplyConfig(cfg GatewayConfig) {
 		existing := g.connections[cc.Domain]
 		if existing != nil && existing.Config.Profile == cc.Profile {
 			existing.Config = cc
+			existing.Handler.UpdateEnvVars(cc.EnvVars)
 			newConns[cc.Domain] = existing
 		} else {
 			// Create new handler

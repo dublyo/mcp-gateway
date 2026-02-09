@@ -17,6 +17,11 @@ func NewHandler(profile profiles.Profile, envVars map[string]string) *Handler {
 	return &Handler{profile: profile, envVars: envVars}
 }
 
+// UpdateEnvVars updates the environment variables without recreating the handler
+func (h *Handler) UpdateEnvVars(envVars map[string]string) {
+	h.envVars = envVars
+}
+
 // HandleMessage processes a JSON-RPC request and returns a response
 func (h *Handler) HandleMessage(raw []byte) *JSONRPCResponse {
 	var req JSONRPCRequest

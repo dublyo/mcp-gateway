@@ -3,6 +3,7 @@ package profiles
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"net"
 	"net/url"
 	"strconv"
@@ -118,20 +119,35 @@ func (p *RedisProfile) redisSet(args map[string]interface{}, env map[string]stri
 }
 
 func (p *RedisProfile) redisDel(args map[string]interface{}, env map[string]string) (string, error) {
-	keysStr := getStr(args, "keys")
-	if keysStr == "" {
+	var keys []string
+
+	// Handle both string ("key1,key2") and array (["key1","key2"]) input
+	switch v := args["keys"].(type) {
+	case string:
+		if v == "" {
+			return "", fmt.Errorf("keys is required")
+		}
+		for _, k := range strings.Split(v, ",") {
+			k = strings.TrimSpace(k)
+			if k != "" {
+				keys = append(keys, k)
+			}
+		}
+	case []interface{}:
+		for _, item := range v {
+			if s, ok := item.(string); ok && s != "" {
+				keys = append(keys, strings.TrimSpace(s))
+			}
+		}
+	default:
 		return "", fmt.Errorf("keys is required")
 	}
-	keys := strings.Split(keysStr, ",")
-	cmdArgs := make([]string, 0, len(keys)+1)
-	cmdArgs = append(cmdArgs, "DEL")
-	for _, k := range keys {
-		k = strings.TrimSpace(k)
-		if k != "" {
-			cmdArgs = append(cmdArgs, k)
-		}
+
+	if len(keys) == 0 {
+		return "", fmt.Errorf("keys is required")
 	}
-	return p.redisCmd(env, cmdArgs[0], cmdArgs[1:]...)
+
+	return p.redisCmd(env, "DEL", keys...)
 }
 
 func (p *RedisProfile) redisKeys(args map[string]interface{}, env map[string]string) (string, error) {
@@ -306,7 +322,7 @@ func readResp(reader *bufio.Reader) (string, error) {
 			return "(nil)", nil
 		}
 		data := make([]byte, length+2) // +2 for \r\n
-		_, err := reader.Read(data)
+		_, err := io.ReadFull(reader, data)
 		if err != nil {
 			return "", fmt.Errorf("read bulk failed: %s", err)
 		}
