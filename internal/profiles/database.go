@@ -130,8 +130,9 @@ func (p *DatabaseProfile) query(args map[string]interface{}, env map[string]stri
 		maxRows = 1000
 	}
 
-	// Add LIMIT if not present
-	if !strings.Contains(normalized, "LIMIT") {
+	// Add LIMIT if not present (only for SELECT/WITH queries)
+	isSelect := strings.HasPrefix(normalized, "SELECT") || strings.HasPrefix(normalized, "WITH")
+	if isSelect && !strings.Contains(normalized, "LIMIT") {
 		sqlStr = sqlStr + fmt.Sprintf(" LIMIT %d", maxRows)
 	}
 
