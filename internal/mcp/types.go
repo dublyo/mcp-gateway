@@ -93,4 +93,4 @@ const (
 	InternalError  = -32603
 )
 
-const ProtocolVersion = "2024-11-05"
+const ProtocolVersion = "2025-11-25"

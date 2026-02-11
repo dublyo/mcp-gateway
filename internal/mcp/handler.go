@@ -64,24 +64,8 @@ func (h *Handler) HandleMessage(raw []byte) *JSONRPCResponse {
 }
 
 func (h *Handler) handleInitialize(req JSONRPCRequest) *JSONRPCResponse {
-	// Parse params to check protocol version
-	if req.Params != nil {
-		paramsBytes, _ := json.Marshal(req.Params)
-		var params InitializeParams
-		if err := json.Unmarshal(paramsBytes, &params); err == nil {
-			if params.ProtocolVersion != "" && params.ProtocolVersion != ProtocolVersion {
-				return &JSONRPCResponse{
-					JSONRPC: "2.0",
-					ID:      req.ID,
-					Error: &JSONRPCError{
-						Code:    InvalidParams,
-						Message: fmt.Sprintf("Unsupported protocol version: %s. Supported: %s", params.ProtocolVersion, ProtocolVersion),
-					},
-				}
-			}
-		}
-	}
-
+	// MCP spec: server responds with its supported version, client decides compatibility.
+	// Never reject — just negotiate by returning our version.
 	return &JSONRPCResponse{
 		JSONRPC: "2.0",
 		ID:      req.ID,
