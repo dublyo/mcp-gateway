@@ -20,12 +20,20 @@ type Session struct {
 	ConnID   string
 	Messages chan []byte // SSE events sent to client
 	done     chan struct{}
+	closeOnce sync.Once
 }
 
 // Server is the HTTP server that handles MCP requests
 type Server struct {
 	gw       *gateway.Gateway
 	sessions sync.Map // sessionID -> *Session
+}
+
+// Close safely closes the session's done channel exactly once
+func (sess *Session) Close() {
+	sess.closeOnce.Do(func() {
+		close(sess.done)
+	})
 }
 
 func New(gw *gateway.Gateway) *Server {
@@ -59,6 +67,14 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(`{"status":"ok"}`))
 }
 
+// setCORS sets CORS headers for all MCP endpoints
+func setCORS(w http.ResponseWriter) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, mcp-session-id")
+	w.Header().Set("Access-Control-Expose-Headers", "mcp-session-id")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
+}
+
 func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 	// Extract domain from Host header
 	host := r.Host
@@ -69,6 +85,15 @@ func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 	conn := s.gw.GetConnection(host)
 	if conn == nil {
 		http.Error(w, "Not Found", http.StatusNotFound)
+		return
+	}
+
+	// Set CORS on all responses
+	setCORS(w)
+
+	// Handle preflight
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 
@@ -147,7 +172,7 @@ func (s *Server) handleSSE(w http.ResponseWriter, r *http.Request, conn *gateway
 	s.gw.IncrementSessions(conn)
 
 	defer func() {
-		close(session.done)
+		session.Close()
 		s.sessions.Delete(sessionID)
 		s.gw.DecrementSessions(conn)
 	}()
@@ -156,7 +181,6 @@ func (s *Server) handleSSE(w http.ResponseWriter, r *http.Request, conn *gateway
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	// Send endpoint event
 	messageURL := fmt.Sprintf("/message?sessionId=%s", sessionID)
@@ -333,7 +357,7 @@ func (s *Server) handleStreamableDelete(w http.ResponseWriter, r *http.Request, 
 	if sessionID != "" {
 		if sessionVal, ok := s.sessions.Load(sessionID); ok {
 			session := sessionVal.(*Session)
-			close(session.done)
+			session.Close()
 			s.sessions.Delete(sessionID)
 		}
 	}
