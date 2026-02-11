@@ -37,6 +37,9 @@ func init() {
 		&TransformProfile{},
 		&DatabaseProfile{},
 		&RedisProfile{},
+		&QRCodeProfile{},
+		&GitProfile{},
+		&DockerProfile{},
 	}
 	for _, p := range reg {
 		Registry[p.ID()] = p
