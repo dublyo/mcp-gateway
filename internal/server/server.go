@@ -116,16 +116,27 @@ func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// authenticateRequest validates the Bearer token
+// authenticateRequest validates the Bearer token or access_token query param
 func (s *Server) authenticateRequest(w http.ResponseWriter, r *http.Request, conn *gateway.Connection) bool {
+	var apiKey string
+
+	// 1. Check Authorization header first
 	auth := r.Header.Get("Authorization")
-	if auth == "" || !strings.HasPrefix(auth, "Bearer ") {
+	if auth != "" && strings.HasPrefix(auth, "Bearer ") {
+		apiKey = strings.TrimPrefix(auth, "Bearer ")
+	}
+
+	// 2. Fall back to access_token query param (ChatGPT style)
+	if apiKey == "" {
+		apiKey = r.URL.Query().Get("access_token")
+	}
+
+	if apiKey == "" {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		s.gw.RecordAuthFailure(conn.Config.ID)
 		return false
 	}
 
-	apiKey := strings.TrimPrefix(auth, "Bearer ")
 	if !s.gw.VerifyAPIKey(conn, apiKey) {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		s.gw.RecordAuthFailure(conn.Config.ID)
