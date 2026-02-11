@@ -91,81 +91,13 @@ func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	path := r.URL.Path
-
-	// OAuth discovery endpoints (no auth required, no connection lookup needed)
-	scheme := "https"
-	origin := scheme + "://" + r.Host
-	switch {
-	case path == "/.well-known/oauth-protected-resource":
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"resource":                 origin,
-			"authorization_servers":    []string{origin},
-			"bearer_methods_supported": []string{"header", "body"},
-			"scopes_supported":         []string{},
-		})
-		return
-	case path == "/.well-known/oauth-authorization-server":
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"issuer":                                origin,
-			"authorization_endpoint":                origin + "/oauth/authorize",
-			"token_endpoint":                        origin + "/oauth/token",
-			"registration_endpoint":                 origin + "/oauth/register",
-			"response_types_supported":              []string{"code"},
-			"grant_types_supported":                 []string{"authorization_code"},
-			"token_endpoint_auth_methods_supported": []string{"none"},
-			"code_challenge_methods_supported":       []string{"S256"},
-		})
-		return
-	case path == "/oauth/authorize":
-		// OAuth authorize: redirect back with the code = access_token from query
-		// ChatGPT sends: /oauth/authorize?response_type=code&client_id=...&redirect_uri=...&state=...&code_challenge=...
-		redirectURI := r.URL.Query().Get("redirect_uri")
-		state := r.URL.Query().Get("state")
-		if redirectURI == "" {
-			http.Error(w, "Missing redirect_uri", http.StatusBadRequest)
-			return
-		}
-		// Use a dummy auth code - the token endpoint will accept any code
-		// and return the access_token that was passed via query param
-		sep := "?"
-		if strings.Contains(redirectURI, "?") {
-			sep = "&"
-		}
-		http.Redirect(w, r, redirectURI+sep+"code=dublyo_auth&state="+state, http.StatusFound)
-		return
-	case path == "/oauth/token" && r.Method == "POST":
-		// OAuth token exchange: return the access_token from the connection
-		// ChatGPT sends: grant_type=authorization_code&code=...&redirect_uri=...&code_verifier=...
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"access_token": "use_query_param",
-			"token_type":   "bearer",
-			"expires_in":   86400 * 365,
-		})
-		return
-	case path == "/oauth/register" && r.Method == "POST":
-		// Dynamic client registration (RFC 7591) — ChatGPT may call this
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"client_id":                    "dublyo-mcp-client",
-			"client_secret":               "",
-			"token_endpoint_auth_method":  "none",
-			"grant_types":                 []string{"authorization_code"},
-			"response_types":              []string{"code"},
-			"redirect_uris":               []string{},
-		})
-		return
-	}
-
 	conn := s.gw.GetConnection(host)
 	if conn == nil {
 		http.Error(w, "Not Found", http.StatusNotFound)
 		return
 	}
+
+	path := r.URL.Path
 
 	// Route to transport
 	switch {
@@ -199,19 +131,13 @@ func (s *Server) authenticateRequest(w http.ResponseWriter, r *http.Request, con
 		apiKey = r.URL.Query().Get("access_token")
 	}
 
-	scheme := "https"
-	origin := scheme + "://" + r.Host
-	wwwAuth := fmt.Sprintf(`Bearer resource_metadata="%s/.well-known/oauth-protected-resource"`, origin)
-
 	if apiKey == "" {
-		w.Header().Set("WWW-Authenticate", wwwAuth)
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		s.gw.RecordAuthFailure(conn.Config.ID)
 		return false
 	}
 
 	if !s.gw.VerifyAPIKey(conn, apiKey) {
-		w.Header().Set("WWW-Authenticate", wwwAuth)
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		s.gw.RecordAuthFailure(conn.Config.ID)
 		return false
