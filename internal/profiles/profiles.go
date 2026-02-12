@@ -24,6 +24,7 @@ func init() {
 		&MemoryProfile{},
 		&FilesystemProfile{},
 		&WordPressKnowledgeProfile{},
+		&FilesKnowledgeProfile{},
 		&ThinkingProfile{},
 		&DnsProfile{},
 		&CryptoProfile{},
