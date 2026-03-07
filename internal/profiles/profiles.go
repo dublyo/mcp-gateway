@@ -42,7 +42,6 @@ func init() {
 		&GitProfile{},
 		&DockerProfile{},
 		&PlaywrightBrowserProfile{},
-		&OpenChromeBrowserProfile{},
 	}
 	for _, p := range reg {
 		Registry[p.ID()] = p
